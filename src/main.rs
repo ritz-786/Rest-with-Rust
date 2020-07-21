@@ -17,6 +17,7 @@ mod db;
 mod employees;
 mod error_handler;
 mod schema;
+mod teachers;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
@@ -28,6 +29,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .route("/", web::get().to(welcome))
             .configure(employees::init_routes)
+            .configure(teachers::init_routes)
     });
 
     server = match listenfd.take_tcp_listener(0)? {
