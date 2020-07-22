@@ -50,6 +50,6 @@ impl ResponseError for CustomError {
             false => "Internal server error".to_string(),
         };
 
-        HttpResponse::build(status_code).json(json!({ "message": error_message }))
+        HttpResponse::build(status_code).json(json!({ "message": error_message, "status": 0 }))
     }
 }

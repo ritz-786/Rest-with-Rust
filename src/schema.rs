@@ -10,8 +10,10 @@ table! {
 }
 
 table! {
-    teachers (id) {
+    teachers (email) {
         id -> Int4,
+        email -> Varchar,
+        password -> Varchar,
         first_name -> Varchar,
         last_name -> Varchar,
         designation -> Varchar,

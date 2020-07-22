@@ -1,12 +1,16 @@
 use crate::db;
 use crate::error_handler::CustomError;
 use crate::schema::teachers;
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, AsChangeset, Insertable)]
 #[table_name = "teachers"]
 pub struct Teacher {
+    pub email: String,
+    pub password: String,
     pub first_name: String,
     pub last_name: String,
     pub designation: String,
@@ -18,6 +22,8 @@ pub struct Teacher {
 #[derive(Serialize, Deserialize, Queryable)]
 pub struct Teachers {
     pub id: i32,
+    pub email: String,
+    pub password: String,
     pub first_name: String,
     pub last_name: String,
     pub designation: String,
@@ -29,6 +35,8 @@ pub struct Teachers {
 impl Teacher {
     fn from(teacher: Teacher) -> Teacher {
         Teacher {
+            email: teacher.email,
+            password: teacher.password,
             first_name: teacher.first_name,
             last_name: teacher.last_name,
             designation: teacher.designation,
@@ -62,7 +70,11 @@ impl Teachers {
 
     pub fn create(teacher: Teacher) -> Result<Self, CustomError> {
         let conn = db::connection()?;
-        let teacher = Teacher::from(teacher);
+        let mut teacher = Teacher::from(teacher);
+        let mut sha = Sha256::new();
+        sha.input_str(teacher.password.as_str());
+        let hash_pw = sha.result_str();
+        teacher.password = hash_pw;
         let teacher = diesel::insert_into(teachers::table)
             .values(teacher)
             .get_result(&conn)?;
