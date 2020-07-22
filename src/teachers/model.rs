@@ -1,9 +1,11 @@
 use crate::db;
 use crate::error_handler::CustomError;
 use crate::schema::teachers;
+use chrono::{DateTime, Duration, Utc};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use diesel::prelude::*;
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, AsChangeset, Insertable)]
@@ -30,6 +32,27 @@ pub struct Teachers {
     pub department: String,
     pub salary: i32,
     pub age: i32,
+}
+
+#[derive(Deserialize)]
+pub struct Login {
+    email: String,
+    password: String,
+    #[serde(default)]
+    remember_me: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String,
+    pub exp: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub message: String,
+    pub status: bool,
+    pub token: String,
 }
 
 impl Teacher {
@@ -66,6 +89,67 @@ impl Teachers {
             .filter(teachers::department.eq(department))
             .load::<Teachers>(&conn)?;
         Ok(teacher)
+    }
+
+    fn find_by_email(email: String) -> Result<Option<Self>, CustomError> {
+        let conn = db::connection()?;
+        let teacher = teachers::table
+            .filter(teachers::email.eq(email))
+            .first(&conn)?;
+        Ok(Some(teacher))
+    }
+
+    pub fn login(user: Login) -> Result<LoginResponse, CustomError> {
+        match Teachers::find_by_email(user.email.to_string()) {
+            Ok(option) => {
+                match option {
+                    Some(x) => {
+                        let mut sha = Sha256::new();
+                        sha.input_str(user.password.as_str());
+                        if x.password == sha.result_str() {
+                            // JWT
+                            let key = std::env::var("SECRET_KEY").unwrap();
+                            let key = key.as_bytes();
+
+                            let mut _date: DateTime<Utc>;
+                            // Remember me
+                            if !user.remember_me {
+                                _date = Utc::now() + Duration::hours(1);
+                            } else {
+                                _date = Utc::now() + Duration::days(365);
+                            }
+
+                            let my_claims = Claims {
+                                sub: user.email,
+                                exp: _date.timestamp() as usize,
+                            };
+
+                            let token = encode(
+                                &Header::default(),
+                                &my_claims,
+                                &EncodingKey::from_secret(key),
+                            )
+                            .unwrap();
+                            Ok(LoginResponse {
+                                status: true,
+                                token,
+                                message: "You have successfully logged in.".to_string(),
+                            })
+                        } else {
+                            Err(CustomError {
+                                error_status_code: 404,
+                                error_message: "Wrong Credentials".to_string(),
+                            })
+                        }
+                    }
+                    None => Err(CustomError {
+                        error_status_code: 404,
+                        error_message: "Wrong Credentials".to_string(),
+                    }),
+                }
+            }
+            Err(err) => Err(err),
+        }
     }
 
     pub fn create(teacher: Teacher) -> Result<Self, CustomError> {
