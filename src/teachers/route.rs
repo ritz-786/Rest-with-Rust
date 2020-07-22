@@ -1,6 +1,6 @@
 use super::model::{Login, Teacher, Teachers};
 use crate::error_handler::CustomError;
-use actix_web::{delete, get, post, put, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 use serde_json::json;
 
@@ -35,6 +35,22 @@ async fn find(id: web::Path<i32>) -> ResponseType {
     Ok(HttpResponse::Ok().json(teacher))
 }
 
+#[get("/teacher/userInformations")]
+async fn user_informations(req: HttpRequest) -> ResponseType {
+    let auth = req.headers().get("Authorization");
+    let split: Vec<&str> = auth.unwrap().to_str().unwrap().split("Bearer").collect();
+    let token = split[1].trim();
+    let teacher = Teachers::user_informations(token)?;
+    if let Some(teach) = teacher {
+        Ok(HttpResponse::Ok().json(teach))
+    } else {
+        Err(CustomError {
+            error_status_code: 404,
+            error_message: "No User Found".to_string(),
+        })
+    }
+}
+
 #[post("/teachers")]
 async fn create(teacher: web::Json<Teacher>) -> ResponseType {
     let teacher = Teachers::create(teacher.into_inner())?;
@@ -58,6 +74,7 @@ pub fn init_routes(config: &mut web::ServiceConfig) {
     config.service(find_all);
     config.service(login);
     config.service(find_by_department);
+    config.service(user_informations);
     config.service(create);
     config.service(update);
     config.service(delete);

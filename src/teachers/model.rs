@@ -152,6 +152,32 @@ impl Teachers {
         }
     }
 
+    pub fn user_informations(token: &str) -> Result<Option<Self>, CustomError> {
+        let key = std::env::var("SECRET_KEY").unwrap();
+        let key = key.as_bytes();
+        let _decode = decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(key),
+            &Validation::new(Algorithm::HS256),
+        );
+
+        match _decode {
+            Ok(decoded) => {
+                match Teachers::find_by_email((decoded.claims.sub.to_string()).parse().unwrap()) {
+                    Ok(user) => Ok(user),
+                    Err(_) => Err(CustomError {
+                        error_status_code: 401,
+                        error_message: "Something Wrong".to_string(),
+                    }),
+                }
+            }
+            Err(_) => Err(CustomError {
+                error_status_code: 401,
+                error_message: "Invalid Token".to_string(),
+            }),
+        }
+    }
+
     pub fn create(teacher: Teacher) -> Result<Self, CustomError> {
         let conn = db::connection()?;
         let mut teacher = Teacher::from(teacher);
